@@ -1,0 +1,29 @@
+<idea-plugin>
+	<id>com.lqd.cli-ai-commit-generator</id>
+	<name>CLI AI Commit Generator</name>
+	<vendor email="petr@lqd.cz" url="https://lqd.cz">Liquid Design</vendor>
+
+	<description><![CDATA[
+		Generates a Conventional Commits message from the changes selected in the
+		commit dialog (file checkboxes and per-hunk inclusion). Pipes the diff into
+		a local CLI AI assistant and streams the result back into the commit
+		message field.
+		<br><br>
+		Currently uses Anthropic's <code>claude</code> CLI with the Haiku model.
+		The <code>claude</code> binary must be on <code>PATH</code> and
+		authenticated. Not affiliated with or endorsed by Anthropic.
+	]]></description>
+
+	<depends>com.intellij.modules.platform</depends>
+	<depends>Git4Idea</depends>
+
+	<actions>
+		<action
+			id="CliAiCommitGenerator.Generate"
+			class="com.lqd.claudecommit.GenerateCommitMessageAction"
+			text="Generate Commit Message with AI"
+			description="Generate a Conventional Commits message from selected changes via local CLI AI">
+			<add-to-group group-id="Vcs.MessageActionGroup" anchor="first"/>
+		</action>
+	</actions>
+</idea-plugin>
