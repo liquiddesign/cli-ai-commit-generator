@@ -9,13 +9,18 @@
 		a local CLI AI assistant and streams the result back into the commit
 		message field.
 		<br><br>
-		Currently uses Anthropic's <code>claude</code> CLI with the Haiku model.
+		Currently uses Anthropic's <code>claude</code> CLI with the Sonnet model.
 		The <code>claude</code> binary must be on <code>PATH</code> and
 		authenticated. Not affiliated with or endorsed by Anthropic.
 	]]></description>
 
 	<depends>com.intellij.modules.platform</depends>
 	<depends>Git4Idea</depends>
+
+	<extensions defaultExtensionNs="com.intellij">
+		<notificationGroup id="CliAiCommitGenerator.Updates" displayType="BALLOON"/>
+		<postStartupActivity implementation="com.lqd.claudecommit.UpdateChecker"/>
+	</extensions>
 
 	<actions>
 		<action

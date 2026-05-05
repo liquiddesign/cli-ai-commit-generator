@@ -29,18 +29,34 @@ import com.intellij.openapi.vcs.changes.Change
 import java.io.StringWriter
 import java.nio.file.Paths
 
-private const val CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+private const val CLAUDE_MODEL = "claude-sonnet-4-6"
 private const val CLAUDE_TIMEOUT_MS = 180_000L
+private const val RECENT_COMMITS_COUNT = 30
 
-private val PROMPT = """
+private val PROMPT_BASE = """
 	Generate a Conventional Commits message in English for the git diff provided on stdin.
 
-	Format:
-	- First line: <type>(<scope>): <subject> — under 70 chars, imperative mood, no trailing period.
-	- type: one of feat, fix, refactor, perf, docs, test, chore, style, build, ci.
-	- scope: a short component name inferred from the changed files. Omit "(scope)" entirely if it would be vague.
-	- If the change is non-trivial, add a blank line and a short bullet-list body explaining WHY (not WHAT).
-	- Output ONLY the commit message. No preamble, no code fences, no commentary, no closing remarks.
+	Format: <type>(<scope>): <subject>
+
+	Rules:
+	- type: exactly one of feat, fix, refactor, chore, docs, style, test, perf, ci, build.
+	- subject: under 70 chars, imperative mood, no trailing period, English.
+	- scope is REQUIRED. Never omit the parentheses. Never use placeholders like "scope",
+	  "general", "misc" — pick a real component name.
+
+	Scope inference, in priority order:
+	1. If the change touches ONLY composer.json and/or composer.lock → output exactly:
+	   chore(deps): update <packages> dependency
+	   (replace <packages> with the actual package names from the diff)
+	2. Otherwise, reuse a scope already used in this project's recent commit history (provided
+	   below) when the change continues or relates to that area — keep the project convention.
+	3. Otherwise, infer a short component name from the changed files (a module/package name,
+	   a top-level directory, or the dominant filename without extension).
+
+	Body:
+	- If the change is non-trivial, add a blank line and a short bullet-list explaining WHY (not WHAT).
+
+	Output ONLY the commit message. No preamble, no code fences, no commentary, no closing remarks.
 """.trimIndent()
 
 class GenerateCommitMessageAction : AnAction(
@@ -99,9 +115,21 @@ class GenerateCommitMessageAction : AnAction(
 						return
 					}
 
-					indicator.text = "Streaming from claude --model haiku…"
+					val recentCommits = try {
+						getRecentCommitSubjects(project)
+					} catch (ex: Exception) {
+						log.warn("Failed to read recent commits — continuing without scope context", ex)
+						""
+					}
+					val effectivePrompt = if (recentCommits.isNotBlank()) {
+						"$PROMPT_BASE\n\nRecent commit subjects in this project (newest first), use to keep scope conventions consistent:\n$recentCommits"
+					} else {
+						PROMPT_BASE
+					}
+
+					indicator.text = "Streaming from claude --model sonnet…"
 					try {
-						streamClaude(diff) { partial ->
+						streamClaude(diff, effectivePrompt) { partial ->
 							ApplicationManager.getApplication().invokeLater {
 								messageControl.setCommitMessage(partial)
 							}
@@ -129,12 +157,42 @@ class GenerateCommitMessageAction : AnAction(
 		return writer.toString()
 	}
 
-	private fun streamClaude(diff: String, onPartial: (String) -> Unit) {
+	private fun getRecentCommitSubjects(project: Project): String {
+		val basePath = project.basePath ?: return ""
+		val cmd = GeneralCommandLine(
+			"git",
+			"log",
+			"--no-merges",
+			"--pretty=format:%s",
+			"-$RECENT_COMMITS_COUNT",
+			"HEAD",
+		).withWorkDirectory(basePath).withCharset(Charsets.UTF_8)
+		val handler = OSProcessHandler(cmd)
+		val out = StringBuilder()
+		handler.addProcessListener(
+			object : ProcessAdapter() {
+				override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
+					if (outputType == ProcessOutputTypes.STDOUT) {
+						out.append(event.text)
+					}
+				}
+			},
+		)
+		handler.startNotify()
+		if (!handler.waitFor(5_000)) {
+			handler.destroyProcess()
+			return ""
+		}
+		if ((handler.exitCode ?: -1) != 0) return ""
+		return out.toString().trim()
+	}
+
+	private fun streamClaude(diff: String, prompt: String, onPartial: (String) -> Unit) {
 		val cmd = GeneralCommandLine(
 			"claude",
 			"--effort", "low",
 			"--model", CLAUDE_MODEL,
-			"-p", PROMPT,
+			"-p", prompt,
 			"--output-format", "stream-json",
 			"--include-partial-messages",
 			"--verbose",

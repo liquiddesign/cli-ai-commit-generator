@@ -13,7 +13,7 @@ The action shows up next to the **Amend** toggle above the commit message:
 3. The plugin builds a unified diff of exactly what would be committed (`IdeaTextPatchBuilder` + `UnifiedDiffWriter`).
 4. The diff is piped on stdin to:
    ```
-   claude --effort low --model claude-haiku-4-5-20251001 -p "<prompt>" \
+   claude --effort low --model claude-sonnet-4-6 -p "<prompt>" \
           --output-format stream-json --include-partial-messages --verbose
    ```
 5. Streamed `text_delta` events are parsed and the commit message field is updated as tokens arrive.
