@@ -21,7 +21,6 @@ dependencies {
 			IntelliJPlatformType.PhpStorm,
 			providers.gradleProperty("platformVersion").get()
 		)
-		bundledPlugin("Git4Idea")
 		// IdeaTextPatchBuilder + UnifiedDiffWriter live in this internal module;
 		// it is not on the default plugin compile classpath since 2026.x.
 		bundledModule("intellij.platform.vcs.impl")
