@@ -27,14 +27,14 @@ The prompt asks for a Conventional Commits message with optional bullet body exp
 
 ## Install
 
-1. Download the latest ZIP from the **[Releases](https://github.com/liquiddesign/claude-commit-plugin/releases/latest)** page.
+1. Download the latest ZIP from the **[Releases](https://github.com/liquiddesign/cli-ai-commit-generator/releases/latest)** page.
 2. In your IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** → pick the ZIP.
 3. Restart the IDE.
 
 ## Build from source
 
 ```bash
-git clone https://github.com/liquiddesign/claude-commit-plugin.git
+git clone https://github.com/liquiddesign/cli-ai-commit-generator.git
 cd claude-commit-plugin
 ./gradlew buildPlugin
 # resulting ZIP: build/distributions/cli-ai-commit-generator-<version>.zip
