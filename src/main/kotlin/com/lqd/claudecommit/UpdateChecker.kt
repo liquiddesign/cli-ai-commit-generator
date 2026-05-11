@@ -20,9 +20,7 @@ private const val RELEASES_API =
 	"https://api.github.com/repos/liquiddesign/cli-ai-commit-generator/releases/latest"
 private const val RELEASES_PAGE =
 	"https://github.com/liquiddesign/cli-ai-commit-generator/releases/latest"
-private const val LAST_CHECK_KEY = "com.lqd.claudecommit.lastUpdateCheckMs"
 private const val LAST_NOTIFIED_KEY = "com.lqd.claudecommit.lastNotifiedVersion"
-private const val CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
 private const val NOTIFICATION_GROUP = "CliAiCommitGenerator.Updates"
 
 class UpdateChecker : ProjectActivity {
@@ -30,10 +28,6 @@ class UpdateChecker : ProjectActivity {
 
 	override suspend fun execute(project: Project) {
 		val props = PropertiesComponent.getInstance()
-		val now = System.currentTimeMillis()
-		val lastCheck = props.getValue(LAST_CHECK_KEY)?.toLongOrNull() ?: 0L
-		if (now - lastCheck < CHECK_INTERVAL_MS) return
-
 		val current = PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID))?.version ?: return
 
 		val latest = try {
@@ -42,8 +36,6 @@ class UpdateChecker : ProjectActivity {
 			log.info("Update check failed: ${ex.message}")
 			return
 		} ?: return
-
-		props.setValue(LAST_CHECK_KEY, now.toString())
 
 		if (compareVersions(latest, current) <= 0) return
 		if (props.getValue(LAST_NOTIFIED_KEY) == latest) return
