@@ -255,15 +255,20 @@ class GenerateCommitMessageAction : AnAction(
 	}
 
 	// Windows IDE on a \\wsl(.localhost|$)\<distro>\... project: invoke claude via wsl.exe so it runs WSL-side.
+	// Wrap in `bash -lc` so a login shell loads ~/.profile and finds `claude` in user-local PATH
+	// (e.g. ~/.local/bin, ~/.npm-global/bin) that a non-interactive shell would miss.
 	private fun buildClaudeCommandLine(basePath: String?, claudeArgs: List<String>): GeneralCommandLine {
 		val distro = detectWslDistroFromUncPath(basePath)
 		val full = if (distro != null) {
-			listOf("wsl.exe", "-d", distro, "--", "claude") + claudeArgs
+			val cmd = (listOf("claude") + claudeArgs).joinToString(" ") { bashSingleQuote(it) }
+			listOf("wsl.exe", "-d", distro, "--", "bash", "-lc", cmd)
 		} else {
 			listOf("claude") + claudeArgs
 		}
 		return GeneralCommandLine(full).withCharset(Charsets.UTF_8)
 	}
+
+	private fun bashSingleQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
 
 	private fun detectWslDistroFromUncPath(basePath: String?): String? {
 		if (basePath == null) return null
