@@ -129,7 +129,7 @@ class GenerateCommitMessageAction : AnAction(
 
 					indicator.text = "Streaming from claude --model sonnet…"
 					try {
-						streamClaude(diff, effectivePrompt) { partial ->
+						streamClaude(project.basePath, diff, effectivePrompt) { partial ->
 							ApplicationManager.getApplication().invokeLater {
 								messageControl.setCommitMessage(partial)
 							}
@@ -187,16 +187,16 @@ class GenerateCommitMessageAction : AnAction(
 		return out.toString().trim()
 	}
 
-	private fun streamClaude(diff: String, prompt: String, onPartial: (String) -> Unit) {
-		val cmd = GeneralCommandLine(
-			"claude",
+	private fun streamClaude(basePath: String?, diff: String, prompt: String, onPartial: (String) -> Unit) {
+		val claudeArgs = listOf(
 			"--effort", "low",
 			"--model", CLAUDE_MODEL,
 			"-p", prompt,
 			"--output-format", "stream-json",
 			"--include-partial-messages",
 			"--verbose",
-		).withCharset(Charsets.UTF_8)
+		)
+		val cmd = buildClaudeCommandLine(basePath, claudeArgs)
 
 		val handler = OSProcessHandler(cmd)
 		val accumulated = StringBuilder()
@@ -252,6 +252,26 @@ class GenerateCommitMessageAction : AnAction(
 		if (finalText.isNotEmpty()) {
 			onPartial(finalText)
 		}
+	}
+
+	// Windows IDE on a \\wsl(.localhost|$)\<distro>\... project: invoke claude via wsl.exe so it runs WSL-side.
+	private fun buildClaudeCommandLine(basePath: String?, claudeArgs: List<String>): GeneralCommandLine {
+		val distro = detectWslDistroFromUncPath(basePath)
+		val full = if (distro != null) {
+			listOf("wsl.exe", "-d", distro, "--", "claude") + claudeArgs
+		} else {
+			listOf("claude") + claudeArgs
+		}
+		return GeneralCommandLine(full).withCharset(Charsets.UTF_8)
+	}
+
+	private fun detectWslDistroFromUncPath(basePath: String?): String? {
+		if (basePath == null) return null
+		if (!System.getProperty("os.name").orEmpty().lowercase().contains("windows")) return null
+		val normalized = basePath.replace('\\', '/')
+		val match = Regex("""^//wsl(?:\$|\.localhost)/([^/]+)(?:/.*)?$""", RegexOption.IGNORE_CASE)
+			.matchEntire(normalized) ?: return null
+		return match.groupValues[1]
 	}
 
 	private fun processStreamLine(
